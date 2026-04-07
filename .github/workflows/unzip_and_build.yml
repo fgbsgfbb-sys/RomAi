@@ -1,67 +1,47 @@
-name: Unzip and Build
-
+name: Build APK
 on:
   workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  unzip-and-build:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Remove old files (except .git and the zip)
-        run: |
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '*.zip' -exec rm -rf {} \;
-
-      - name: Unzip the archive
-        run: |
-          ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "❌ ZIP-файл не найден!"
-            exit 1
-          fi
-          echo "Распаковываем $ZIP_FILE ..."
-          unzip -o "$ZIP_FILE"
-          rm "$ZIP_FILE"
-
-      - name: Set up JDK 17
+      - uses: actions/checkout@v4
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-
+          distribution: temurin
+          java-version: 17
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install NDK and CMake
+      - name: Install NDK + CMake
         run: |
           sdkmanager "ndk;26.1.10909125" "cmake;3.22.1"
-
-      - name: Clone llama.cpp
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Clone llama.cpp (if needed)
         run: |
-          git clone https://github.com/ggerganov/llama.cpp.git app/src/main/cpp/llama.cpp
-          cd app/src/main/cpp/llama.cpp
-          git checkout master
-
-      - name: Install Gradle
-        run: |
-          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip -q gradle-8.7-bin.zip
-          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
-
-      - name: Create local.properties
-        run: |
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "ndk.dir=$ANDROID_HOME/ndk/26.1.10909125" >> local.properties
-
-      - name: Build Debug APK with stacktrace
-        run: |
-          gradle assembleDebug --stacktrace
-
+          if [ ! -d "app/src/main/cpp/llama.cpp" ]; then
+            git clone https://github.com/ggerganov/llama.cpp.git app/src/main/cpp/llama.cpp
+          fi
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RomAI-debug
+          name: romai-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 30
+          retention-days: 7
