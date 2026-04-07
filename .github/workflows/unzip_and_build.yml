@@ -50,9 +50,14 @@ jobs:
           unzip -q gradle-8.7-bin.zip
           echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
 
-      - name: Build Debug APK
+      - name: Create local.properties
         run: |
-          gradle assembleDebug
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "ndk.dir=$ANDROID_HOME/ndk/26.1.10909125" >> local.properties
+
+      - name: Build Debug APK with stacktrace
+        run: |
+          gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
