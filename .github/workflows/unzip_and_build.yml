@@ -45,7 +45,7 @@ jobs:
         run: |
           git clone https://github.com/ggerganov/llama.cpp.git app/src/main/cpp/llama.cpp
           cd app/src/main/cpp/llama.cpp
-          git checkout b3637
+          git checkout master
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
